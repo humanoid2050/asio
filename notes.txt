@@ -1,0 +1,161 @@
+
+asio device
+    timer
+    connection
+        serial (stream, client, opts)
+        socket
+            stream/dgram
+            server/client
+            
+            
+            
+socket description
+    stream/dgram
+    server/client
+    server -> group/unique
+    dgram+client -> unicast/multicast
+serial description
+    flow
+    parity
+    stop bits
+    data bits
+timer description
+    rate
+    
+    
+    
+asio device API:
+    send(buffer) //called by handler send
+    handle_receive(buffer) //called by boost asio, calls handler handle_receive
+handler API:
+    send(data) //called externally, calls asio device send
+    handle_receive(buffer) //called by handle_receive
+    
+    
+stream client:
+    stream receiver
+    stream sender
+    
+dgram client:
+    dgram sender
+
+stream server:
+
+stream connection:
+
+
+dgram server:
+
+dgram connection:
+
+========================================================================================
+
+type          description    connection     handler
+----------------------------------------------------------------
+timer           timer         timer          timer
+serial          conn          serial         conn
+tcp client      conn          tcp cli        conn
+tcp server      conn          tcp svr        conn
+udp client      conn          udp cli        conn
+udp server      conn          udp svr        conn
+
+
+========================================================================================
+
+server pattern:
+    connect, disconnect, send
+    
+    multi-connection servers need per connection handlers.... works if server can spawn handler objects.
+    
+--Single handler pattern
+create handler object
+create description 
+pass description to factory
+factory returns acceptor object
+handler gets pointer to acceptor
+acceptor gets pointer to handler
+acceptor gets connection
+connection object is created by acceptor
+acceptor logs pointer to connection
+connection object gets pointer to handler
+ 
+--multi handler pattern
+create handler object
+create description 
+pass description to factory
+factory returns acceptor object
+handler gets pointer to acceptor
+acceptor gets pointer to handler
+acceptor gets connection
+connection object is created by acceptor
+acceptor logs pointer to connection
+connection handler is created by acceptor
+connection object gets pointer to connection handler
+connection handler gets pointer to connection
+
+
+
+    
+    
+    
+handler exposes API, is bound to asio object
+
+
+=============================================================================
+
+Callbacks can be implemented as pointers to objects implementing an appropriate API
+or as function objects provided to the caller.
+
+handler pros:
+single methods to bind handler and connection
+
+handler cons:
+multi-connection systems require "passthrough" handlers
+requires a distinct API for handlers
+
+function pros:
+possible to directly bind multiple connections to a single multi-connection handler
+
+function cons:
+requires multiple bind operations per connection
+
+
+==============================================================================
+
+auto-create metahandler 
+metahandler constructs component handlers (possibly with a reference to self as an argument)
+metahandler constructs connections (registered with connection manager)
+metahandler binds handlers and connections
+
+===============================================================================
+
+async_read                -> buffer or stream_buf, optional completion condition
+async_read_at             -> buffer or stream_buf, optional completion condition,        offset parameter
+async_read_until          ->           stream_buf, delimiter or other content criteria
+stream async_read_some    -> buffer,               no criteria
+stream async_receive      -> buffer,               no criteria,                          read options flag
+dgram async_receive       -> buffer,               no criteria
+dgram async_receive_from  -> buffer,               no criteria,                          sender socket
+
+
+
+for stream connections:
+use free functions returning stream_buf objects with preference for completion conditions to only invoke handlers when a 
+message has been completely received
+
+for dgram connections
+use socket methods to return buffer with complete message
+
+===============================================================================
+
+stream server, single meta-handler, no connection differentiation:
+metahandler invokes connection factory to create acceptor, binds acceptor back to metahandler
+acceptor gets connection, invokes connection factory to create connection, binds connection back to metahandler
+
+
+
+stream server, single meta-handler, connection differentiation:
+metahandler invokes connection factory to create acceptor, binds acceptor back to metahandler
+acceptor creates handler (creating unconnected connection object) for future use
+acceptor activates connection and binds handler back to metahandler 
+
