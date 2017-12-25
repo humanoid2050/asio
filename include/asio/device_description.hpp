@@ -42,7 +42,7 @@ public:
         persistent_ = persist;
     };
     
-    bool get_persistent()
+    bool is_persistent()
     {
         std::lock_guard<std::mutex> lock(mtx_);
         return persistent_;

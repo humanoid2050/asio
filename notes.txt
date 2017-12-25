@@ -159,3 +159,176 @@ metahandler invokes connection factory to create acceptor, binds acceptor back t
 acceptor creates handler (creating unconnected connection object) for future use
 acceptor activates connection and binds handler back to metahandler 
 
+
+=================================================================================
+
+
+user facing object
+    send and handle receive methods for pushing data into and out of user space
+    these need to work transparently with the back-end connection, be it server or client pattern
+    
+a server spawns a connection object that could be used the same as a normal client
+the quirk is that there may be more than one connection at a time
+
+
+server handler needs to be socket independent the say way a connection handler does
+
+
+
+
+design pattern 1:
+handler (with logic) <--> socket
+
+design pattern 2:
+meta-handler (with logic) <--------> socket handler <--> socket
+                               \
+                                ---> timer handler <--> timer
+
+pattern 2 allows for complete abstraction of client/server differences if both client and server
+provide the same external api
+
+this could be accomplished by having the server masquarade as a client, simply proxying the api
+of a single client
+
+
+server patterns:
+    single client
+    multiple equivalent clients
+    unique clients
+
+single client and equivalent client servers can be achieved by binding the connection callbacks to a 
+single server object (needs to be thread safe). send would have to be proxied by the server handler,
+since it logs all connections
+
+unique client servers must create unique handlers for each connection and binding the connection
+callbacks to unique handlers
+
+is there ever a use case for binding unique clients back to a single meta handler? broadcast send? group disconnect?
+
+
+
+a typical handler can only be used in the context of a client connection or single/equivalent connections created by a server
+
+in the context of unique connections, a server handler must be able to create typical handlers. likely these
+typical handlers will need additional constructor arguments to differentiate themselves from each other.
+
+===================================================================================================
+
+dgram connection server
+
+server binds and opens a port
+client connects (source can be logged with receive_from)
+
+if the client is making a request, the reply can be direct
+if the server is sending out data, then the previously logged connections are targeted for sending
+
+
+if connections are to be treated as carrying independent state, then connections need to be logged as 
+a <connection,handler> map and each inbound message routed to the appropriate handler
+
+
+======================================================================================================
+
+handler is instantiated by main process
+description is instantiated by main process
+
+handler and description are passed to factory to create connection
+connection is instantiated with a pointer to the handler
+the handler .....
+
+===================================================================================================
+
+if a data source is designed for dgram (atomic transfer of a complete msg)
+    it can be (approximately) processed out of a stream buffer by reading all data at every cycle
+    
+if a data source is designed for stream (msg boundaries are intrinsic to the data structure)
+    it can be processed as a dgram message if the parsing logic is standalone
+    
+--> recovering structured data from stream or dgram is easy (parse it or the message is complete already)
+--> recovering unstructured data can only be done from dgram where the message is complete (or you just assume and pray)
+
+if the message must be processed to determine its size, it makes no sense to double up the processing by convering to 
+    dgram and then processing again for content
+    
+a dgram received message can easily be processed by a stream parser (parser should conclude at end of message)
+    this requires that the message data be converted from buffer to stream object container
+
+what stream<-->buffer conversions are available??
+    stream -> buffer
+        piecemeal parsing for size
+        assume read is message
+    buffer -> stream
+        append data to streambuf
+
+
+====================================================================================================
+
+pattern 1:
+    stream socket is read with no arguments into streambuf
+    handler operates on streambuf, consuming what data it can
+    
+pattern 2:
+    stream socket is read with a size argument into a streambuf
+    handler operates on streambuf, consuming what data it can to specify the next read quantity
+    
+pattern 3: (ascii only)
+    stream socket is read with a delimiter argument into a streambuf
+    handler operates on streambuf, consuming all the data
+    
+pattern 4:
+    dgram socket is read atomically
+    handler consumes entire buffer
+    
+pattern 5:
+    dgram socket is read atomically
+    read buffer is copied into streambuf for stream handler operations (pattern 1, 2, or 3)
+    
+
+
+since tcp is reliable, then all data will arrive on the receiving end. ergo, a udp-like interface
+can be implemented as long as the message size is known (or computable). This is a fragile solution
+though from the perspective that once it's desynchronized (or if intial synchronization does not
+occur) then everything else will fail and it may be undetectable
+
+
+====================================================================================================
+
+if you shovel all data into a stream
+    stream parsing of stream transfers works fine
+    stream parsing of dgram transfers works fine
+    dgram parsing of dgram transfers works fine (unnecessary copy)
+    dgram parsing of stream transfers is shaky if the parsing of the message is keyed off the message size
+
+
+===================================================================================================
+    
+each connection to a server should be indepenent....
+stream server must spawn individual handler-server pairs
+dgram server can spawn per-connection handlers, or do all of the logic in one handler if the connection is stateless
+
+
+====================================================================================================
+
+do dgram connections need to always define both send and recieve params?
+probably....
+
+dgram server: open local port (no remotes defined) and all responses are sent to the address recored by receive_from
+    1: stateless server
+    2: connection specific state
+dgram client: open local port and specify remote port
+
+
+====================================================================================================
+
+server patterns
+    independent connections
+    muxing to singular parent
+    identified connections with singular backend
+    
+=====================================================================================================
+
+
+p2p asio
+server non-differentiated clients
+server unique clients
+

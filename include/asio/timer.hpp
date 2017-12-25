@@ -20,7 +20,10 @@ public:
         //timer_.expires_from_now(std::chrono::seconds(60));
     }
     
-    
+    virtual bool stop()
+    {
+        
+    }
     
 protected:
     

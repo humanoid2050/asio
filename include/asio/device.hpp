@@ -14,7 +14,7 @@
 class asio_device
 {
 public:
-    asio_device(boost::asio::io_service & service, std::unique_ptr<deviceDescription> description = std::unique_ptr<deviceDescription>())
+    asio_device(boost::asio::io_service & service, std::unique_ptr<deviceDescription> description)
         : description_(std::move(description)), running_(ATOMIC_FLAG_INIT)
     {
     }
@@ -25,15 +25,19 @@ public:
     }
     
    
-    virtual bool start() {};
+    virtual bool start() { return false; };
     
-    virtual bool stop() {};
+    virtual bool stop() { return true; };
     
-    virtual bool restart() {};
+    virtual bool restart()
+    {
+        stop();
+        if (description_->is_persistent()) start();
+        return true;
+    };
     
-public:
+protected:
 
-    std::weak_ptr<handler_base> handler_;
     std::shared_ptr<deviceDescription> description_; 
     
     std::atomic_flag running_;

@@ -22,17 +22,24 @@ public:
     enum class roll : uint8_t
     {
         CLIENT = 0,
-        SERVER = 4
+        UNIFORM_SERVER = 4,
+        UNIQUE_SERVER = 8
     };
     
-    socketDescription(std::string host, uint32_t port, protocol p, roll r) //IP
-        : deviceDescription(deviceType::SOCKET,true), domain_(domain::IP), addr_(host), port_(port), protocol_(p), roll_(r)
+    socketDescription(std::string host, uint16_t port, protocol p, roll r, uint8_t count = 1) //IP
+        : deviceDescription(deviceType::SOCKET,true), domain_(domain::IP), addr_(host), port_(port), protocol_(p), roll_(r), count_(count)
     {
         
     }
     
-    socketDescription(std::string address, protocol p, roll r) //LOCAL
-        : deviceDescription(deviceType::SOCKET,true), domain_(domain::LOCAL), addr_(address), protocol_(p), roll_(r)
+    socketDescription(std::string address, protocol p, roll r, uint8_t count = 1) //LOCAL
+        : deviceDescription(deviceType::SOCKET,true), domain_(domain::LOCAL), addr_(address), protocol_(p), roll_(r), count_(count)
+    {
+        
+    }
+    
+    socketDescription(domain d, protocol p)
+        : deviceDescription(deviceType::SOCKET,false), domain_(d), protocol_(p), roll_(roll::CLIENT)
     {
         
     }
@@ -98,6 +105,16 @@ public:
     {
         return roll_;
     }
+    
+    void set_count(uint8_t count)
+    {
+        count_ = count;
+    }
+    
+    uint8_t get_count()
+    {
+        return count_;
+    }
 
     void set_multicast(std::string group_addr)
     {
@@ -128,9 +145,6 @@ public:
     {
         return broadcast_;
     }
-
-
-
     
 private:
     std::string addr_;
@@ -138,6 +152,7 @@ private:
     domain domain_;
     protocol protocol_;
     roll roll_;
+    uint8_t count_;
     
     bool broadcast_;
     std::string multicast_addr_;
