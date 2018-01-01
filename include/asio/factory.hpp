@@ -15,13 +15,12 @@ class deviceFactory
 {
 public:
     static std::unique_ptr<asio_connection> make_connection(boost::asio::io_service & service, 
-                                                            std::unique_ptr<deviceDescription> description, 
-                                                            std::shared_ptr<connection_handler>handler = std::shared_ptr<connection_handler>())
+                                                            std::unique_ptr<deviceDescription> description)
     {
         switch (description->get_type())
         {
         case deviceDescription::deviceType::SERIAL:
-            return std::unique_ptr<asio_connection>(new serial_device(service, std::move(description), std::move(handler)));
+            return std::unique_ptr<asio_connection>(new serial_device(service, std::move(description)));
         case deviceDescription::deviceType::SOCKET:
             //mask: 0 LOCAL, 1 IP; 0 STREAM, 2 DGRAM; 0 CLIENT, 4 SERVER
             switch (static_cast<uint8_t>(static_cast<socketDescription*>(description.get())->get_domain()) | 
@@ -29,21 +28,21 @@ public:
                     static_cast<uint8_t>(static_cast<socketDescription*>(description.get())->get_roll()))
             {
             case 0:
-                return std::unique_ptr<asio_connection>(new local_stream_client(service, std::move(description), std::move(handler)));
+                return std::unique_ptr<asio_connection>(new local_stream_client(service, std::move(description)));
             case 1:
-                return std::unique_ptr<asio_connection>(new tcp_client(service, std::move(description), std::move(handler)));
+                return std::unique_ptr<asio_connection>(new tcp_client(service, std::move(description)));
             case 2:
-                return std::unique_ptr<asio_connection>(new local_dgram_client(service, std::move(description), std::move(handler)));
+                return std::unique_ptr<asio_connection>(new local_dgram_client(service, std::move(description)));
             case 3:
-                return std::unique_ptr<asio_connection>(new udp_client(service, std::move(description), std::move(handler)));
+                return std::unique_ptr<asio_connection>(new udp_client(service, std::move(description)));
             case 4:
-                return std::unique_ptr<asio_connection>(new local_stream_server(service, std::move(description), std::move(handler)));
+                return std::unique_ptr<asio_connection>(new local_stream_server(service, std::move(description)));
             case 5:
-                return std::unique_ptr<asio_connection>(new tcp_server(service, std::move(description), std::move(handler)));
+                return std::unique_ptr<asio_connection>(new tcp_server(service, std::move(description)));
             case 6:
-                return std::unique_ptr<asio_connection>(new local_dgram_server(service, std::move(description), std::move(handler)));
+                return std::unique_ptr<asio_connection>(new local_dgram_server(service, std::move(description)));
             case 7:
-                return std::unique_ptr<asio_connection>(new udp_server(service, std::move(description), std::move(handler)));
+                return std::unique_ptr<asio_connection>(new udp_server(service, std::move(description)));
             }
         
         case deviceDescription::deviceType::UNSET:

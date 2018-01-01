@@ -29,8 +29,8 @@ public:
     bool connect() { return false; };
     bool stop() { return false; };
     
-    stream_connection_base(boost::asio::io_service & io_service, std::unique_ptr<deviceDescription> description, std::shared_ptr<connection_handler> handler)
-        : asio_connection(io_service, std::move(description), std::move(handler)), socket_(io_service)
+    stream_connection_base(boost::asio::io_service & io_service, std::unique_ptr<deviceDescription> description)
+        : asio_connection(io_service, std::move(description)), socket_(io_service)
     {
         
     }
@@ -40,7 +40,7 @@ public:
         if (connected_.test_and_set(std::memory_order_acquire)) return;
         if (!err)
         {
-            if (auto h = handler_.lock()) h->on_connect();
+            on_connect(true);
             start_io();
         }
         else if (err != boost::asio::error::operation_aborted)
@@ -92,8 +92,7 @@ public:
     {
         if (!err)
         {
-            if (auto h = handler_.lock()) h->on_receive();
-            if (auto h = handler_.lock()) h->handle_receive(buff_);
+            on_receive(buff_);
             start_receive();
         }
         else
@@ -117,8 +116,8 @@ protected:
 template<class conn_T>
 class stream_connection : stream_connection_base<conn_T>
 {
-    stream_connection(boost::asio::io_service & io_service, std::unique_ptr<deviceDescription> description, std::shared_ptr<connection_handler> handler)
-        : stream_connection_base<boost::asio::ip::tcp::socket>(io_service, std::move(description), std::move(handler))
+    stream_connection(boost::asio::io_service & io_service, std::unique_ptr<deviceDescription> description)
+        : stream_connection_base<boost::asio::ip::tcp::socket>(io_service, std::move(description))
     {
         
     }
@@ -133,8 +132,8 @@ template<>
 class stream_connection<boost::asio::ip::tcp::socket> : public stream_connection_base<boost::asio::ip::tcp::socket> 
 {
 public:
-    stream_connection(boost::asio::io_service & io_service, std::unique_ptr<deviceDescription> description, std::shared_ptr<connection_handler> handler)
-        : stream_connection_base<boost::asio::ip::tcp::socket>(io_service, std::move(description), std::move(handler)), resolver_(io_service)
+    stream_connection(boost::asio::io_service & io_service, std::unique_ptr<deviceDescription> description)
+        : stream_connection_base<boost::asio::ip::tcp::socket>(io_service, std::move(description)), resolver_(io_service)
     {
         
     }
@@ -159,10 +158,7 @@ public:
         //only perform on_disconnect if the connected flag has previously been thrown
         if (connected_.test_and_set(std::memory_order_acquire))
         {
-            if (auto h = handler_.lock())
-            {
-                h->on_disconnect();
-            }
+            on_disconnect(true);
         }
         connected_.clear(std::memory_order_release);
         //putting the connecting_ flag release after the connected_ checks prevents race conditions
@@ -198,8 +194,8 @@ template<>
 class stream_connection<boost::asio::local::stream_protocol::socket> : public stream_connection_base<boost::asio::local::stream_protocol::socket>
 {
 public:
-    stream_connection(boost::asio::io_service & io_service, std::unique_ptr<deviceDescription> description, std::shared_ptr<connection_handler> handler)
-        : stream_connection_base<boost::asio::local::stream_protocol::socket>(io_service, std::move(description), std::move(handler))
+    stream_connection(boost::asio::io_service & io_service, std::unique_ptr<deviceDescription> description)
+        : stream_connection_base<boost::asio::local::stream_protocol::socket>(io_service, std::move(description))
     {
         
     }
@@ -220,10 +216,7 @@ public:
         //only perform on_disconnect if the connected flag has previously been thrown
         if (connected_.test_and_set(std::memory_order_acquire))
         {
-            if (auto h = handler_.lock())
-            {
-                h->on_disconnect();
-            }
+            on_disconnect(true);
         }
         connected_.clear(std::memory_order_release);
         //putting the connecting_ flag release after the connected_ checks prevents race conditions
@@ -240,8 +233,8 @@ template<>
 class stream_connection<boost::asio::serial_port> : public stream_connection_base<boost::asio::serial_port>
 {
 public:
-    stream_connection(boost::asio::io_service & io_service, std::unique_ptr<deviceDescription> description, std::shared_ptr<connection_handler> handler)
-        : stream_connection_base<boost::asio::serial_port>(io_service, std::move(description), std::move(handler))
+    stream_connection(boost::asio::io_service & io_service, std::unique_ptr<deviceDescription> description)
+        : stream_connection_base<boost::asio::serial_port>(io_service, std::move(description))
     {
         
     }
@@ -252,6 +245,7 @@ public:
         auto desc = std::static_pointer_cast<serialDescription>(description_);
         try 
         {
+            notify(1,std::string("connecting"));
             socket_.open(desc->get_device());
             socket_.set_option(boost::asio::serial_port::baud_rate(static_cast<uint32_t>(desc->get_baud())));
         } catch (boost::system::system_error& se) {
@@ -270,10 +264,7 @@ public:
         //only perform on_disconnect if the connected flag has previously been thrown
         if (connected_.test_and_set(std::memory_order_acquire))
         {
-            if (auto h = handler_.lock())
-            {
-                h->on_disconnect();
-            }
+            on_disconnect(true);
         }
         connected_.clear(std::memory_order_release);
         //putting the connecting_ flag release after the connected_ checks prevents race conditions

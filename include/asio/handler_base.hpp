@@ -1,11 +1,8 @@
 #ifndef ASIO_HANDLER_BASE_HPP
 #define ASIO_HANDLER_BASE_HPP
 
-//#include "asio/device.hpp"
-
-//class asio_device;
-
 #include <string>
+#include <iostream>
 
 class handler_base
 {
@@ -16,9 +13,15 @@ public:
         
     }
     
-    virtual void handle_start(bool success = true) {};
-    virtual void handle_stop(bool success = true) {};
-    virtual void handle_notify(int level, std::string message) {};
+    virtual bool on_start(bool success = true) { return true; };
+    
+    virtual bool on_stop(bool success = true) { return true; };
+    
+    virtual bool handle_notify(int level, std::string message)
+    {
+        std::cout << "level " << level << " notification: " << message << std::endl;
+        
+    };
     
 
 };

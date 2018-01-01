@@ -46,8 +46,8 @@ public:
     }
     
 protected:    
-    singular_stream_server(boost::asio::io_service & io_service, std::unique_ptr<deviceDescription> description, std::shared_ptr<connection_handler> handler, std::size_t max_connection_count = 1)
-        : asio_connection(io_service, std::move(description), std::move(handler)), acceptor_(io_service), max_connection_count_(max_connection_count)
+    singular_stream_server(boost::asio::io_service & io_service, std::unique_ptr<deviceDescription> description, std::size_t max_connection_count = 1)
+        : asio_connection(io_service, std::move(description)), acceptor_(io_service), max_connection_count_(max_connection_count)
     {
         
     }
@@ -55,21 +55,18 @@ protected:
     bool start_accept()
     {
         if (accepting_.test_and_set(std::memory_order_acquire)) return false;
-        if (auto handler = handler_.lock())
-        {
+
             
-            //create connection object
-            auto parent_desc = static_cast<socketDescription*>(description_.get());
-            auto client_desc = std::unique_ptr<socketDescription>(new socketDescription(parent_desc->get_domain(),parent_desc->get_protocol()));
-            //create the connection prebound to the handler that owns this stream_server object
-            clients_.emplace_back(new stream_connection<typename family_T::socket>(acceptor_.get_io_service(), std::move(client_desc), std::move(handler)));
-            
-            acceptor_.async_accept(clients_.back()->get_socket(),    
-                boost::bind(&singular_stream_server<family_T>::handle_accept,this, boost::asio::placeholders::error));
-            return true;
-        }
-        accepting_.clear(std::memory_order_release);
-        return false;
+        //create connection object
+        auto parent_desc = static_cast<socketDescription*>(description_.get());
+        auto client_desc = std::unique_ptr<socketDescription>(new socketDescription(parent_desc->get_domain(),parent_desc->get_protocol()));
+        //create the connection prebound to the handler that owns this stream_server object
+        clients_.emplace_back(new stream_connection<typename family_T::socket>(acceptor_.get_io_service(), std::move(client_desc)));
+        
+        acceptor_.async_accept(clients_.back()->get_socket(),    
+            boost::bind(&singular_stream_server<family_T>::handle_accept,this, boost::asio::placeholders::error));
+        return true;
+        
         
     }
 
@@ -117,8 +114,8 @@ protected:
 class tcp_server : public singular_stream_server<boost::asio::ip::tcp>
 {
 public:
-    tcp_server(boost::asio::io_service & io_service, std::unique_ptr<deviceDescription> description, std::shared_ptr<connection_handler> handler)
-        : singular_stream_server<boost::asio::ip::tcp>(io_service, std::move(description), std::move(handler))
+    tcp_server(boost::asio::io_service & io_service, std::unique_ptr<deviceDescription> description)
+        : singular_stream_server<boost::asio::ip::tcp>(io_service, std::move(description))
     {
         
     }
@@ -145,8 +142,8 @@ protected:
 class local_stream_server : public singular_stream_server<boost::asio::local::stream_protocol>
 {
 public:
-    local_stream_server(boost::asio::io_service & io_service, std::unique_ptr<deviceDescription> description, std::shared_ptr<connection_handler> handler)
-        : singular_stream_server<boost::asio::local::stream_protocol>(io_service, std::move(description), std::move(handler))
+    local_stream_server(boost::asio::io_service & io_service, std::unique_ptr<deviceDescription> description)
+        : singular_stream_server<boost::asio::local::stream_protocol>(io_service, std::move(description))
     {
         
     }

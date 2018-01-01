@@ -3,13 +3,13 @@
 
 #include <deque>
 #include <mutex>
+#include <boost/signals2.hpp>
+#include <functional>
 
 #include "asio/asio_device.hpp"
-#include "asio/connection_handler.hpp"
 
 using message = std::pair<int,std::shared_ptr<std::vector<uint8_t>>>;
 
-class connection_handler;
 
 class asio_connection : public asio_device
 {
@@ -76,15 +76,45 @@ public:
     
     virtual void start_receive() {};
     
-    void bind_handler(std::shared_ptr<connection_handler> handler)
+    void bind_on_start(std::function<bool (bool)> handler)
     {
-        handler_ = handler;
+        on_start.connect(handler);
+    }
+    
+    void bind_on_stop(std::function<bool (bool)> handler)
+    {
+        on_stop.connect(handler);
+    }
+    
+    void bind_notify(std::function<bool (int, std::string)> handler)
+    {
+        notify.connect(handler);
+    }
+    
+    void bind_on_connect(std::function<bool (bool)> handler)
+    {
+        on_connect.connect(handler);
+    }
+    
+    void bind_on_disconnect(std::function<bool (bool)> handler)
+    {
+        on_disconnect.connect(handler);
+    }
+    
+    void bind_on_send(std::function<bool (uint32_t, bool)> handler)
+    {
+        on_send.connect(handler);
+    }
+    
+    void bind_on_receive(std::function<bool (boost::asio::streambuf& msg_stream)> handler)
+    {
+        on_receive.connect(handler);
     }
     
 protected:
     
-    asio_connection(boost::asio::io_service & io_service, std::unique_ptr<deviceDescription> description, std::shared_ptr<connection_handler> handler)
-        : asio_device(io_service, std::move(description)), connected_(ATOMIC_FLAG_INIT), connecting_(ATOMIC_FLAG_INIT), handler_(handler)
+    asio_connection(boost::asio::io_service & io_service, std::unique_ptr<deviceDescription> description)
+        : asio_device(io_service, std::move(description)), connected_(ATOMIC_FLAG_INIT), connecting_(ATOMIC_FLAG_INIT)
     {
         
     }
@@ -96,8 +126,15 @@ protected:
     std::deque<message> outbound_msg_;
     std::size_t max_out_que_;
     
-    std::weak_ptr<connection_handler> handler_;
+    boost::signals2::signal<bool (bool)> on_start;
+    boost::signals2::signal<bool (bool)> on_stop;
+    boost::signals2::signal<bool (int, std::string)> notify;
     
+    boost::signals2::signal<bool (bool)> on_connect;
+    boost::signals2::signal<bool (bool)> on_disconnect;
+    boost::signals2::signal<bool (uint32_t, bool)> on_send;
+    boost::signals2::signal<bool (boost::asio::streambuf& msg_stream)> on_receive;
+
     std::atomic_flag sending_;
     
     boost::asio::streambuf buff_;

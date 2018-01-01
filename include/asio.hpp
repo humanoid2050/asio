@@ -4,9 +4,8 @@
 #include "asio/socket_description.hpp"
 #include "asio/serial_description.hpp"
 #include "asio/timer_description.hpp"
-#include "asio/factory.hpp"
-#include "asio/connection_handler.hpp"
-//#include "asio/stream_server_handler.hpp"
 
+#include "asio/connection_handler.hpp"
+#include "asio/factory.hpp"
 
 #endif

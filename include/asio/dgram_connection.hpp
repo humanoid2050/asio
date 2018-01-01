@@ -45,9 +45,9 @@ public:
     {
         if (!err)
         {
-            if (auto h = handler_.lock()) h->on_receive();
+            on_receive(buff_);
             //the handler should queue up the next receive
-            //start_receive();
+            start_receive();
         }
         else
         {
@@ -61,8 +61,8 @@ public:
     }
 
 protected:
-    dgram_connection(boost::asio::io_service & io_service, std::unique_ptr<deviceDescription> description, std::shared_ptr<connection_handler> handler)
-        : asio_connection(io_service, std::move(description), std::move(handler)), socket_(io_service)
+    dgram_connection(boost::asio::io_service & io_service, std::unique_ptr<deviceDescription> description)
+        : asio_connection(io_service, std::move(description)), socket_(io_service)
     {
         
     }
@@ -76,8 +76,8 @@ protected:
 class udp_client : public dgram_connection<boost::asio::ip::udp::socket> 
 {
 public:
-    udp_client(boost::asio::io_service & io_service, std::unique_ptr<deviceDescription> description, std::shared_ptr<connection_handler> handler)
-        : dgram_connection<boost::asio::ip::udp::socket>(io_service, std::move(description), std::move(handler)), resolver_(io_service)
+    udp_client(boost::asio::io_service & io_service, std::unique_ptr<deviceDescription> description)
+        : dgram_connection<boost::asio::ip::udp::socket>(io_service, std::move(description)), resolver_(io_service)
     {
         
     }
@@ -111,7 +111,7 @@ public:
         if (!err)
         {
             connected_.test_and_set(std::memory_order_acquire);
-            if (auto h = handler_.lock()) h->on_connect();
+            on_connect(true);
             start_io();
         }
         else if (err != boost::asio::error::operation_aborted)
@@ -127,7 +127,7 @@ public:
         socket_.cancel();
         socket_.close();
         connected_.clear(std::memory_order_release);
-        if (auto h = handler_.lock()) h->on_disconnect();
+        on_disconnect(true);
         running_.clear(std::memory_order_release);
     }
 
@@ -140,8 +140,8 @@ protected:
 class udp_server : public dgram_connection<boost::asio::ip::udp::socket> 
 {
 public:
-    udp_server(boost::asio::io_service & io_service, std::unique_ptr<deviceDescription> description, std::shared_ptr<connection_handler> handler)
-        : dgram_connection<boost::asio::ip::udp::socket>(io_service, std::move(description), std::move(handler)), resolver_(io_service)
+    udp_server(boost::asio::io_service & io_service, std::unique_ptr<deviceDescription> description)
+        : dgram_connection<boost::asio::ip::udp::socket>(io_service, std::move(description)), resolver_(io_service)
     {
         
     }
@@ -169,7 +169,7 @@ public:
         if (!err)
         {
             connected_.test_and_set(std::memory_order_acquire);
-            if (auto h = handler_.lock()) h->on_connect();
+            on_connect(true);
             start_io();
         }
         else if (err != boost::asio::error::operation_aborted)
@@ -185,7 +185,7 @@ public:
         socket_.cancel();
         socket_.close();
         connected_.clear(std::memory_order_release);
-        if (auto h = handler_.lock()) h->on_disconnect();
+        on_disconnect(true);
         running_.clear(std::memory_order_release);
     }
 
@@ -198,8 +198,8 @@ protected:
 class local_dgram_client : public dgram_connection<boost::asio::local::datagram_protocol::socket>
 {
 public:
-    local_dgram_client(boost::asio::io_service & io_service, std::unique_ptr<deviceDescription> description, std::shared_ptr<connection_handler> handler)
-        : dgram_connection<boost::asio::local::datagram_protocol::socket>(io_service, std::move(description), std::move(handler))
+    local_dgram_client(boost::asio::io_service & io_service, std::unique_ptr<deviceDescription> description)
+        : dgram_connection<boost::asio::local::datagram_protocol::socket>(io_service, std::move(description))
     {
         
     }
@@ -216,7 +216,7 @@ public:
         if (!err)
         {
             connected_.test_and_set(std::memory_order_acquire);
-            if (auto h = handler_.lock()) h->on_connect();
+            on_connect(true);
             start_io();
         }
         else if (err != boost::asio::error::operation_aborted)
@@ -231,7 +231,7 @@ public:
         socket_.cancel();
         socket_.close();
         connected_.clear(std::memory_order_release);
-        if (auto h = handler_.lock()) h->on_disconnect();
+        on_disconnect(true);
         running_.clear(std::memory_order_release);
     }
 };
@@ -240,8 +240,8 @@ public:
 class local_dgram_server : public dgram_connection<boost::asio::local::datagram_protocol::socket>
 {
 public:
-    local_dgram_server(boost::asio::io_service & io_service, std::unique_ptr<deviceDescription> description, std::shared_ptr<connection_handler> handler)
-        : dgram_connection<boost::asio::local::datagram_protocol::socket>(io_service, std::move(description), std::move(handler))
+    local_dgram_server(boost::asio::io_service & io_service, std::unique_ptr<deviceDescription> description)
+        : dgram_connection<boost::asio::local::datagram_protocol::socket>(io_service, std::move(description))
     {
         
     }
@@ -262,7 +262,7 @@ public:
         if (!err)
         {
             connected_.test_and_set(std::memory_order_acquire);
-            if (auto h = handler_.lock()) h->on_connect();
+            on_connect(true);
             start_io();
         }
         else if (err != boost::asio::error::operation_aborted)
@@ -277,7 +277,7 @@ public:
         socket_.cancel();
         socket_.close();
         connected_.clear(std::memory_order_release);
-        if (auto h = handler_.lock()) h->on_disconnect();
+        on_disconnect(true);
         running_.clear(std::memory_order_release);
     }
 };
