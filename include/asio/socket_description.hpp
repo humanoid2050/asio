@@ -56,12 +56,12 @@ public:
     
     
 
-    void set_host(std::string host)
+    void set_address(std::string addr)
     {
-        addr_ = host;
+        addr_ = addr;
     }
 
-    std::string get_host()
+    std::string get_address()
     {
         return addr_;
     }
@@ -74,16 +74,6 @@ public:
     uint32_t get_port()
     {
         return port_;
-    }
-
-    void set_local_addr(std::string addr)
-    {
-        addr_ = addr;
-    }
-
-    std::string get_local_addr()
-    {
-        return addr_;
     }
 
     void set_protocol(protocol proto)

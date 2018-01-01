@@ -1,8 +1,7 @@
 #ifndef ASIO_DGRAM_CONNECTION_HPP
 #define ASIO_DGRAM_CONNECTION_HPP
 
-#include "asio/connection.hpp"
-#include "asio/connection_handler.hpp"
+#include "asio/asio_connection.hpp"
 #include "asio/socket_description.hpp"
 
 #include <mutex>
@@ -15,11 +14,6 @@ template <class conn_T>
 class dgram_connection : public asio_connection
 {
 public:
-    dgram_connection(boost::asio::io_service & io_service, std::unique_ptr<deviceDescription> description)
-        : asio_connection(io_service, std::move(description)), socket_(io_service)
-    {
-        
-    }
     
     bool do_send()
     {
@@ -51,7 +45,7 @@ public:
     {
         if (!err)
         {
-            if (auto h = handler_.lock()) std::static_pointer_cast<connection_handler>(h)->on_receive();
+            if (auto h = handler_.lock()) h->on_receive();
             //the handler should queue up the next receive
             //start_receive();
         }
@@ -67,9 +61,13 @@ public:
     }
 
 protected:
+    dgram_connection(boost::asio::io_service & io_service, std::unique_ptr<deviceDescription> description, std::shared_ptr<connection_handler> handler)
+        : asio_connection(io_service, std::move(description), std::move(handler)), socket_(io_service)
+    {
+        
+    }
+
     conn_T socket_;
-    
-   
 
 };
 
@@ -78,8 +76,8 @@ protected:
 class udp_client : public dgram_connection<boost::asio::ip::udp::socket> 
 {
 public:
-    udp_client(boost::asio::io_service & io_service, std::unique_ptr<deviceDescription> description)
-        : dgram_connection<boost::asio::ip::udp::socket>(io_service, std::move(description)), resolver_(io_service)
+    udp_client(boost::asio::io_service & io_service, std::unique_ptr<deviceDescription> description, std::shared_ptr<connection_handler> handler)
+        : dgram_connection<boost::asio::ip::udp::socket>(io_service, std::move(description), std::move(handler)), resolver_(io_service)
     {
         
     }
@@ -88,7 +86,7 @@ public:
     {
         if (connected_.test_and_set(std::memory_order_acquire)) return false;
         auto desc = std::static_pointer_cast<socketDescription>(description_);
-        boost::asio::ip::udp::resolver::query query(desc->get_host(), std::to_string(desc->get_port()));
+        boost::asio::ip::udp::resolver::query query(desc->get_address(), std::to_string(desc->get_port()));
         resolver_.async_resolve(query, boost::bind(&udp_client::handle_resolve, this, 
                                 boost::asio::placeholders::error, boost::asio::placeholders::iterator));
         return true;
@@ -113,7 +111,7 @@ public:
         if (!err)
         {
             connected_.test_and_set(std::memory_order_acquire);
-            if (auto h = handler_.lock()) std::static_pointer_cast<connection_handler>(h)->on_connect();
+            if (auto h = handler_.lock()) h->on_connect();
             start_io();
         }
         else if (err != boost::asio::error::operation_aborted)
@@ -129,7 +127,7 @@ public:
         socket_.cancel();
         socket_.close();
         connected_.clear(std::memory_order_release);
-        if (auto h = handler_.lock()) std::static_pointer_cast<connection_handler>(h)->on_disconnect();
+        if (auto h = handler_.lock()) h->on_disconnect();
         running_.clear(std::memory_order_release);
     }
 
@@ -139,11 +137,69 @@ protected:
 
 
 
-class local_dgram_client : public dgram_connection<boost::asio::local::stream_protocol::socket>
+class udp_server : public dgram_connection<boost::asio::ip::udp::socket> 
 {
 public:
-    local_dgram_client(boost::asio::io_service & io_service, std::unique_ptr<deviceDescription> description)
-        : dgram_connection<boost::asio::local::stream_protocol::socket>(io_service, std::move(description))
+    udp_server(boost::asio::io_service & io_service, std::unique_ptr<deviceDescription> description, std::shared_ptr<connection_handler> handler)
+        : dgram_connection<boost::asio::ip::udp::socket>(io_service, std::move(description), std::move(handler)), resolver_(io_service)
+    {
+        
+    }
+    
+    bool connect()
+    {
+        if (connected_.test_and_set(std::memory_order_acquire)) return false;
+        auto desc = std::static_pointer_cast<socketDescription>(description_);
+        
+        boost::asio::ip::udp::endpoint ep(boost::asio::ip::udp::v4(), desc->get_port());
+        if (!desc->get_address().empty())
+            ep.address(boost::asio::ip::address::from_string(desc->get_address()));
+        
+        socket_.open(boost::asio::ip::udp::v4());
+        boost::system::error_code ec;
+        socket_.bind(ep,ec);
+        handle_connect (ec);
+        
+        return true;
+    }
+
+
+    void handle_connect(const boost::system::error_code& err)
+    {
+        if (!err)
+        {
+            connected_.test_and_set(std::memory_order_acquire);
+            if (auto h = handler_.lock()) h->on_connect();
+            start_io();
+        }
+        else if (err != boost::asio::error::operation_aborted)
+        {
+            restart();
+        }
+    }
+    
+    virtual bool stop()
+    {
+        resolver_.cancel();
+        socket_.shutdown(boost::asio::ip::udp::socket::shutdown_both);
+        socket_.cancel();
+        socket_.close();
+        connected_.clear(std::memory_order_release);
+        if (auto h = handler_.lock()) h->on_disconnect();
+        running_.clear(std::memory_order_release);
+    }
+
+protected:
+    boost::asio::ip::udp::resolver resolver_;
+};
+
+
+
+class local_dgram_client : public dgram_connection<boost::asio::local::datagram_protocol::socket>
+{
+public:
+    local_dgram_client(boost::asio::io_service & io_service, std::unique_ptr<deviceDescription> description, std::shared_ptr<connection_handler> handler)
+        : dgram_connection<boost::asio::local::datagram_protocol::socket>(io_service, std::move(description), std::move(handler))
     {
         
     }
@@ -151,7 +207,7 @@ public:
     virtual bool connect()
     {
         auto desc = std::static_pointer_cast<socketDescription>(description_);
-        boost::asio::local::stream_protocol::endpoint ep(desc->get_local_addr());
+        boost::asio::local::datagram_protocol::endpoint ep(desc->get_address());
         socket_.async_connect(ep, boost::bind(&local_dgram_client::handle_connect, this, boost::asio::placeholders::error));
     }
     
@@ -160,7 +216,7 @@ public:
         if (!err)
         {
             connected_.test_and_set(std::memory_order_acquire);
-            if (auto h = handler_.lock()) std::static_pointer_cast<connection_handler>(h)->on_connect();
+            if (auto h = handler_.lock()) h->on_connect();
             start_io();
         }
         else if (err != boost::asio::error::operation_aborted)
@@ -175,10 +231,55 @@ public:
         socket_.cancel();
         socket_.close();
         connected_.clear(std::memory_order_release);
-        if (auto h = handler_.lock()) std::static_pointer_cast<connection_handler>(h)->on_disconnect();
+        if (auto h = handler_.lock()) h->on_disconnect();
         running_.clear(std::memory_order_release);
     }
 };
 
+
+class local_dgram_server : public dgram_connection<boost::asio::local::datagram_protocol::socket>
+{
+public:
+    local_dgram_server(boost::asio::io_service & io_service, std::unique_ptr<deviceDescription> description, std::shared_ptr<connection_handler> handler)
+        : dgram_connection<boost::asio::local::datagram_protocol::socket>(io_service, std::move(description), std::move(handler))
+    {
+        
+    }
+    
+    virtual bool connect()
+    {
+        auto desc = std::static_pointer_cast<socketDescription>(description_);
+        
+        socket_.open(boost::asio::local::datagram_protocol());
+        boost::asio::local::datagram_protocol::endpoint ep(desc->get_address());
+        boost::system::error_code ec;
+        socket_.bind(ep,ec);
+        handle_connect(ec);
+    }
+    
+    void handle_connect(const boost::system::error_code& err)
+    {
+        if (!err)
+        {
+            connected_.test_and_set(std::memory_order_acquire);
+            if (auto h = handler_.lock()) h->on_connect();
+            start_io();
+        }
+        else if (err != boost::asio::error::operation_aborted)
+        {
+            restart();
+        }
+    }
+    
+    virtual bool stop()
+    {
+        socket_.shutdown(boost::asio::ip::udp::socket::shutdown_both);
+        socket_.cancel();
+        socket_.close();
+        connected_.clear(std::memory_order_release);
+        if (auto h = handler_.lock()) h->on_disconnect();
+        running_.clear(std::memory_order_release);
+    }
+};
 
 #endif

@@ -8,7 +8,7 @@
 #include <boost/asio.hpp>
 
 #include "asio/device_description.hpp"
-#include "asio/handler_base.hpp"
+//#include "asio/handler_base.hpp"
 
 
 class asio_device

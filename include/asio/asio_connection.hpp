@@ -4,7 +4,7 @@
 #include <deque>
 #include <mutex>
 
-#include "asio/device.hpp"
+#include "asio/asio_device.hpp"
 #include "asio/connection_handler.hpp"
 
 using message = std::pair<int,std::shared_ptr<std::vector<uint8_t>>>;
@@ -65,7 +65,7 @@ public:
     
     virtual bool do_send() {};
     
-    void handle_send(std::shared_ptr<std::vector<uint8_t>> msg, const boost::system::error_code& err, size_t count)
+    void handle_send(message msg, const boost::system::error_code& err, size_t count)
     {
         if (!err) {
             do_send();
@@ -80,11 +80,11 @@ public:
     {
         handler_ = handler;
     }
-
+    
 protected:
     
     asio_connection(boost::asio::io_service & io_service, std::unique_ptr<deviceDescription> description, std::shared_ptr<connection_handler> handler)
-        : asio_device(io_service, std::move(description)), connected_(ATOMIC_FLAG_INIT), handler_(handler)
+        : asio_device(io_service, std::move(description)), connected_(ATOMIC_FLAG_INIT), connecting_(ATOMIC_FLAG_INIT), handler_(handler)
     {
         
     }

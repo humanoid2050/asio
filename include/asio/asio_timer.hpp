@@ -2,7 +2,7 @@
 #define ASIO_TIMER_HPP
 
 #include <boost/asio/steady_timer.hpp>
-#include "asio/device.hpp"
+#include "asio/asio_device.hpp"
 #include "timer_description.hpp"
 
 

@@ -327,8 +327,30 @@ server patterns
     
 =====================================================================================================
 
-
 p2p asio
 server non-differentiated clients
 server unique clients
+
+
+====================================================================================================
+
+the function of the factory:
+components:
+    connection
+    handler
+    server
+    
+    
+stream client:
+    1. handler exists, connection object gets instantiated and bound
+
+dgram client (known remote):
+    1. handler exists, connection is randomly bound and expects to receive traffic on the randomly bound port
+
+stream server:
+    1. instantiate one handler per connection
+    2. handler exists, only one connection is allowed at a time
+
+dgram server:
+    1. handler exists, handles all messages sent to a single address using read_from
 
