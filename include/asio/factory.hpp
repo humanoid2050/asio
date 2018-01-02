@@ -16,11 +16,12 @@ class deviceFactory
 public:
     static std::unique_ptr<asio_connection> make_connection(boost::asio::io_service & service, 
                                                             std::unique_ptr<deviceDescription> description, 
-                                                            std::shared_ptr<connection_handler>handler = std::shared_ptr<connection_handler>())
+                                                            std::shared_ptr<connection_handler>handler)
     {
         switch (description->get_type())
         {
         case deviceDescription::deviceType::SERIAL:
+            handler->notify(log_level::DEEP_DEBUG,"deviceFactory making serial_device");
             return std::unique_ptr<asio_connection>(new serial_device(service, std::move(description), std::move(handler)));
         case deviceDescription::deviceType::SOCKET:
             //mask: 0 LOCAL, 1 IP; 0 STREAM, 2 DGRAM; 0 CLIENT, 4 SERVER

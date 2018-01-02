@@ -55,17 +55,18 @@ protected:
     bool start_accept()
     {
         if (accepting_.test_and_set(std::memory_order_acquire)) return false;
+        
+        //create connection object
+        auto parent_desc = static_cast<socketDescription*>(description_.get());
+        auto client_desc = std::unique_ptr<socketDescription>(new socketDescription(parent_desc->get_domain(),parent_desc->get_protocol()));
+        //create the connection prebound to the handler that owns this stream_server object
         if (auto handler = handler_.lock())
         {
             
-            //create connection object
-            auto parent_desc = static_cast<socketDescription*>(description_.get());
-            auto client_desc = std::unique_ptr<socketDescription>(new socketDescription(parent_desc->get_domain(),parent_desc->get_protocol()));
-            //create the connection prebound to the handler that owns this stream_server object
+            
             clients_.emplace_back(new stream_connection<typename family_T::socket>(acceptor_.get_io_service(), std::move(client_desc), std::move(handler)));
             
-            acceptor_.async_accept(clients_.back()->get_socket(),    
-                boost::bind(&singular_stream_server<family_T>::handle_accept,this, boost::asio::placeholders::error));
+            acceptor_.async_accept(clients_.back()->get_socket(), boost::bind(&singular_stream_server<family_T>::handle_accept,this, boost::asio::placeholders::error));
             return true;
         }
         accepting_.clear(std::memory_order_release);

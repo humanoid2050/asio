@@ -354,3 +354,14 @@ stream server:
 dgram server:
     1. handler exists, handles all messages sent to a single address using read_from
 
+
+=====================================================================================================
+
+class : handler
+
+
+io_svc + description + handler_ptr --(factory)-> device
+
+
+cannot create handler_ptr from class constructor
+

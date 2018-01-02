@@ -45,9 +45,7 @@ public:
     {
         if (!err)
         {
-            if (auto h = handler_.lock()) h->on_receive();
-            //the handler should queue up the next receive
-            //start_receive();
+            on_receive(buff_);
         }
         else
         {
@@ -111,7 +109,7 @@ public:
         if (!err)
         {
             connected_.test_and_set(std::memory_order_acquire);
-            if (auto h = handler_.lock()) h->on_connect();
+            on_connect();
             start_io();
         }
         else if (err != boost::asio::error::operation_aborted)
@@ -127,7 +125,7 @@ public:
         socket_.cancel();
         socket_.close();
         connected_.clear(std::memory_order_release);
-        if (auto h = handler_.lock()) h->on_disconnect();
+        on_disconnect();
         running_.clear(std::memory_order_release);
     }
 
@@ -169,7 +167,7 @@ public:
         if (!err)
         {
             connected_.test_and_set(std::memory_order_acquire);
-            if (auto h = handler_.lock()) h->on_connect();
+            on_connect();
             start_io();
         }
         else if (err != boost::asio::error::operation_aborted)
@@ -185,7 +183,7 @@ public:
         socket_.cancel();
         socket_.close();
         connected_.clear(std::memory_order_release);
-        if (auto h = handler_.lock()) h->on_disconnect();
+        on_disconnect();
         running_.clear(std::memory_order_release);
     }
 
@@ -216,7 +214,7 @@ public:
         if (!err)
         {
             connected_.test_and_set(std::memory_order_acquire);
-            if (auto h = handler_.lock()) h->on_connect();
+            on_connect();
             start_io();
         }
         else if (err != boost::asio::error::operation_aborted)
@@ -231,7 +229,7 @@ public:
         socket_.cancel();
         socket_.close();
         connected_.clear(std::memory_order_release);
-        if (auto h = handler_.lock()) h->on_disconnect();
+        on_disconnect();
         running_.clear(std::memory_order_release);
     }
 };
@@ -262,7 +260,7 @@ public:
         if (!err)
         {
             connected_.test_and_set(std::memory_order_acquire);
-            if (auto h = handler_.lock()) h->on_connect();
+            on_connect();
             start_io();
         }
         else if (err != boost::asio::error::operation_aborted)
@@ -277,7 +275,7 @@ public:
         socket_.cancel();
         socket_.close();
         connected_.clear(std::memory_order_release);
-        if (auto h = handler_.lock()) h->on_disconnect();
+        on_disconnect();
         running_.clear(std::memory_order_release);
     }
 };

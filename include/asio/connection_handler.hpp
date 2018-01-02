@@ -11,25 +11,17 @@ class asio_connection;
 class connection_handler : public handler_base
 {
 public:
-    connection_handler(boost::asio::io_service & io_service, std::unique_ptr<deviceDescription> description) 
-    {
-        //device_ = deviceFactory::make_connection(io_service, std::move(description));
-    }
-    
-    virtual bool on_connect(bool success = true) {};
-    virtual bool on_disconnect(bool success = true) {};
-    
-    virtual bool on_send(uint32_t id = 0, bool success = true) {};
-    virtual bool on_receive(uint32_t id = 0, bool success = true) {};
-    
-    //called directly, or chunked out 
-    virtual bool handle_receive(boost::asio::streambuf& msg_stream)
+    connection_handler() 
     {
         
     }
     
-protected:
-    std::shared_ptr<asio_connection> device_;
+    virtual bool on_connect(bool success = true) {}
+    virtual bool on_disconnect(bool success = true) {}
+    
+    virtual bool on_send(uint32_t id = 0, bool success = true) {}
+    virtual bool on_receive(boost::asio::streambuf& msg_stream) {}
+    
     
     
 };

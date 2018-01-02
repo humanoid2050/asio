@@ -22,6 +22,7 @@ public:
 //inherited API overrides
     virtual bool start()
     {
+        notify(log_level::DEEP_DEBUG,"asio_connection::start()");
         if (running_.test_and_set(std::memory_order_acquire)) return false;
         bool rc = connect();
         if (!rc) running_.clear(std::memory_order_release);
@@ -30,12 +31,21 @@ public:
     
     
 //added API for connections
-    virtual bool connect() { return false; };
+    virtual bool connect()
+    {
+        return false;
+        notify(log_level::DEEP_DEBUG,"asio_connection::connect()");
+    };
     
-    virtual bool disconnect() { return false; };
+    virtual bool disconnect()
+    {
+        return false;
+        notify(log_level::DEEP_DEBUG,"asio_connection::disconnect()");
+    };
     
     bool send(message msg)
     {
+        notify(log_level::DEEP_DEBUG,"asio_connection::send(message msg)");
         {
             std::lock_guard<std::mutex> lock(outbound_mutex_);
             outbound_msg_.push_back(msg);
@@ -53,20 +63,27 @@ public:
 //internal methods
     bool start_io()
     {
+        notify(log_level::DEEP_DEBUG,"asio_connection::start_io()");
         start_send();
         start_receive();
     }
     
     bool start_send()
     {
+        notify(log_level::DEEP_DEBUG,"asio_connection::start_send()");
         if (sending_.test_and_set(std::memory_order_acquire)) return false;
         return do_send();
     }
     
-    virtual bool do_send() {};
+    virtual bool do_send()
+    {
+        notify(log_level::DEEP_DEBUG,"asio_connection::do_send()");
+        return false;
+    };
     
     void handle_send(message msg, const boost::system::error_code& err, size_t count)
     {
+        notify(log_level::DEEP_DEBUG,"asio_connection::handle_send()");
         if (!err) {
             do_send();
         } else {
@@ -74,12 +91,58 @@ public:
         }
     }
     
-    virtual void start_receive() {};
+    virtual void start_receive()
+    {
+        notify(log_level::DEEP_DEBUG,"asio_connection::start_receive()");
+    };
     
+    
+//some convenience methods
     void bind_handler(std::shared_ptr<connection_handler> handler)
     {
         handler_ = handler;
     }
+    
+    inline bool on_start(bool success = true)
+    {
+        if (auto h = handler_.lock()) return h->on_start(success);
+        else return true;
+    }
+    
+    inline bool on_stop(bool success = true)
+    {
+        if (auto h = handler_.lock()) return h->on_stop(success);
+        else return true;
+    }
+    
+    inline void notify(log_level level, std::string message)
+    {
+        if (auto h = handler_.lock()) h->notify(level,message);
+    }
+    
+    inline bool on_connect(bool success = true)
+    {
+        if (auto h = handler_.lock()) return h->on_connect(success);
+        else return true;
+    }
+    inline bool on_disconnect(bool success = true)
+    {
+        if (auto h = handler_.lock()) return h->on_disconnect(success);
+        else return true;
+    }
+    
+    inline bool on_send(uint32_t id = 0, bool success = true)
+    {
+        if (auto h = handler_.lock()) return h->on_send(id,success);
+        else return true;
+    }
+    
+    inline bool on_receive(boost::asio::streambuf& msg_stream)
+    {
+        if (auto h = handler_.lock()) return h->on_receive(msg_stream);
+        else return true;
+    }
+    
     
 protected:
     

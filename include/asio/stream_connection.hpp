@@ -26,21 +26,26 @@ public:
     //virtual bool disconnect() { return false; };
     //bool send(message msg)
     
-    bool connect() { return false; };
-    bool stop() { return false; };
-    
-    stream_connection_base(boost::asio::io_service & io_service, std::unique_ptr<deviceDescription> description, std::shared_ptr<connection_handler> handler)
-        : asio_connection(io_service, std::move(description), std::move(handler)), socket_(io_service)
+    bool connect() 
     {
+        notify(log_level::DEEP_DEBUG,"stream_connection_base<class conn_T>::connect()");
+        return false; 
+    };
         
-    }
+    bool stop() 
+    {
+        notify(log_level::DEEP_DEBUG,"stream_connection_base<class conn_T>::stop()");
+        return false; 
+    };
+    
 //override internal methods
     void handle_connect(const boost::system::error_code& err)
     {
+        notify(log_level::DEEP_DEBUG,"stream_connection_base<class conn_T>::handle_connect(const boost::system::error_code& err)");
         if (connected_.test_and_set(std::memory_order_acquire)) return;
         if (!err)
         {
-            if (auto h = handler_.lock()) h->on_connect();
+            on_connect();
             start_io();
         }
         else if (err != boost::asio::error::operation_aborted)
@@ -51,6 +56,7 @@ public:
     
     bool do_send()
     {
+        notify(log_level::DEEP_DEBUG,"stream_connection_base<class conn_T>::do_send()");
         message msg;
         //critial operations are the check, copy, and pop
         {
@@ -71,18 +77,21 @@ public:
 
     void start_receive()
     {
+        notify(log_level::DEEP_DEBUG,"stream_connection_base<class conn_T>::start_receive()");
         boost::asio::async_read(socket_, buff_, boost::asio::transfer_at_least(1), boost::bind(&stream_connection_base<conn_T>::handle_receive, this, 
             boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
     }
     
     void start_receive(std::size_t count)
     {
+        notify(log_level::DEEP_DEBUG,"stream_connection_base<class conn_T>::start_receive(std::size_t count)");
         boost::asio::async_read(socket_, buff_, boost::asio::transfer_exactly(count), boost::bind(&stream_connection_base<conn_T>::handle_receive, this, 
             boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
     }
     
     void start_receive(std::string delim)
     {
+        notify(log_level::DEEP_DEBUG,"stream_connection_base<class conn_T>::start_receive(std::string delim)");
         boost::asio::async_read_until(socket_, buff_, delim, boost::bind(&stream_connection_base<conn_T>::handle_receive, this, 
             boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
     }
@@ -90,11 +99,11 @@ public:
 
     void handle_receive(const boost::system::error_code& err, std::size_t count)
     {
+        notify(log_level::DEEP_DEBUG,"stream_connection_base<class conn_T>::handle_receive(const boost::system::error_code& err, std::size_t count)");
         if (!err)
         {
-            if (auto h = handler_.lock()) h->on_receive();
-            if (auto h = handler_.lock()) h->handle_receive(buff_);
-            start_receive();
+            //buff_.commit(count);
+            on_receive(buff_);
         }
         else
         {
@@ -108,11 +117,17 @@ public:
     }
 
 protected:    
-    conn_T socket_;
+    stream_connection_base(boost::asio::io_service & io_service, std::unique_ptr<deviceDescription> description, std::shared_ptr<connection_handler> handler)
+        : asio_connection(io_service, std::move(description), std::move(handler)), socket_(io_service)
+    {
+        notify(log_level::DEEP_DEBUG,"stream_connection_base<class conn_T> constructor");
+    }
     
-    boost::asio::streambuf buff_;
+    conn_T socket_;
 
 };
+
+
 
 template<class conn_T>
 class stream_connection : stream_connection_base<conn_T>
@@ -120,7 +135,7 @@ class stream_connection : stream_connection_base<conn_T>
     stream_connection(boost::asio::io_service & io_service, std::unique_ptr<deviceDescription> description, std::shared_ptr<connection_handler> handler)
         : stream_connection_base<boost::asio::ip::tcp::socket>(io_service, std::move(description), std::move(handler))
     {
-        
+        //notify(log_level::DEEP_DEBUG,"stream_connection<class conn_T> constructor");
     }
     
 };
@@ -136,11 +151,13 @@ public:
     stream_connection(boost::asio::io_service & io_service, std::unique_ptr<deviceDescription> description, std::shared_ptr<connection_handler> handler)
         : stream_connection_base<boost::asio::ip::tcp::socket>(io_service, std::move(description), std::move(handler)), resolver_(io_service)
     {
-        
+        notify(log_level::DEEP_DEBUG,"stream_connection<boost::asio::ip::tcp::socket> constructor");
+        connect();
     }
     
     bool connect()
     {
+        notify(log_level::DEEP_DEBUG,"stream_connection<boost::asio::ip::tcp::socket>::connect()");
         if (connecting_.test_and_set(std::memory_order_acquire)) return false;
         auto desc = std::static_pointer_cast<socketDescription>(description_);
         boost::asio::ip::tcp::resolver::query query(desc->get_address(), std::to_string(desc->get_port()));
@@ -152,6 +169,7 @@ public:
     
     bool stop()
     {
+        notify(log_level::DEEP_DEBUG,"stream_connection<boost::asio::ip::tcp::socket>::stop()");
         resolver_.cancel();
         socket_.shutdown(boost::asio::ip::tcp::socket::shutdown_both);
         socket_.cancel();
@@ -159,10 +177,7 @@ public:
         //only perform on_disconnect if the connected flag has previously been thrown
         if (connected_.test_and_set(std::memory_order_acquire))
         {
-            if (auto h = handler_.lock())
-            {
-                h->on_disconnect();
-            }
+            on_disconnect();
         }
         connected_.clear(std::memory_order_release);
         //putting the connecting_ flag release after the connected_ checks prevents race conditions
@@ -171,9 +186,9 @@ public:
     }
 
 protected:
-
     void handle_resolve(const boost::system::error_code& err, boost::asio::ip::tcp::resolver::iterator endpoint_iterator)
     {
+        notify(log_level::DEEP_DEBUG,"stream_connection<boost::asio::ip::tcp::socket>::handle_resolve(const boost::system::error_code& err, boost::asio::ip::tcp::resolver::iterator endpoint_iterator)");
         if (!err)
         {
             // Attempt a connection to each endpoint in the list until we
@@ -186,8 +201,8 @@ protected:
         }
     }
 
-
     boost::asio::ip::tcp::resolver resolver_;
+
 };
 
 
@@ -201,11 +216,13 @@ public:
     stream_connection(boost::asio::io_service & io_service, std::unique_ptr<deviceDescription> description, std::shared_ptr<connection_handler> handler)
         : stream_connection_base<boost::asio::local::stream_protocol::socket>(io_service, std::move(description), std::move(handler))
     {
-        
+        notify(log_level::DEEP_DEBUG,"stream_connection<boost::asio::local::stream_protocol::socket> constructor");
+        connect();
     }
     
     bool connect()
     {
+        notify(log_level::DEEP_DEBUG,"stream_connection<boost::asio::local::stream_protocol::socket>::connect()");
         if (connecting_.test_and_set(std::memory_order_acquire)) return false;
         auto desc = std::static_pointer_cast<socketDescription>(description_);
         boost::asio::local::stream_protocol::endpoint ep(desc->get_address());
@@ -214,16 +231,14 @@ public:
     
     bool stop()
     {
+        notify(log_level::DEEP_DEBUG,"stream_connection<boost::asio::local::stream_protocol::socket>::stop()");
         socket_.shutdown(boost::asio::ip::tcp::socket::shutdown_both);
         socket_.cancel();
         socket_.close();
         //only perform on_disconnect if the connected flag has previously been thrown
         if (connected_.test_and_set(std::memory_order_acquire))
         {
-            if (auto h = handler_.lock())
-            {
-                h->on_disconnect();
-            }
+            on_disconnect();
         }
         connected_.clear(std::memory_order_release);
         //putting the connecting_ flag release after the connected_ checks prevents race conditions
@@ -243,11 +258,13 @@ public:
     stream_connection(boost::asio::io_service & io_service, std::unique_ptr<deviceDescription> description, std::shared_ptr<connection_handler> handler)
         : stream_connection_base<boost::asio::serial_port>(io_service, std::move(description), std::move(handler))
     {
-        
+        notify(log_level::DEEP_DEBUG,"stream_connection<boost::asio::serial_port> constructor");
+        connect();
     }
     
     bool connect()
     {
+        notify(log_level::DEEP_DEBUG,"stream_connection<boost::asio::serial_port>::connect()");
         if (connecting_.test_and_set(std::memory_order_acquire)) return false;
         auto desc = std::static_pointer_cast<serialDescription>(description_);
         try 
@@ -255,6 +272,7 @@ public:
             socket_.open(desc->get_device());
             socket_.set_option(boost::asio::serial_port::baud_rate(static_cast<uint32_t>(desc->get_baud())));
         } catch (boost::system::system_error& se) {
+            notify(log_level::WARN,"no serial device at " + desc->get_device());
             socket_.close();
             connected_.clear(std::memory_order_release);
             return false;
@@ -265,15 +283,13 @@ public:
     
     bool stop()
     {
+        notify(log_level::DEEP_DEBUG,"stream_connection<boost::asio::serial_port>::stop()");
         socket_.cancel();
         socket_.close();
         //only perform on_disconnect if the connected flag has previously been thrown
         if (connected_.test_and_set(std::memory_order_acquire))
         {
-            if (auto h = handler_.lock())
-            {
-                h->on_disconnect();
-            }
+            on_disconnect();
         }
         connected_.clear(std::memory_order_release);
         //putting the connecting_ flag release after the connected_ checks prevents race conditions

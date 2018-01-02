@@ -11,7 +11,7 @@ public:
         device_ = deviceFactory::make_timer(io_service, std::move(description));
     }
     
-    virtual bool handle_timeout(bool success);
+    virtual bool on_timeout(bool success);
     
 protected:
     std::shared_ptr<asio_timer> device_;
